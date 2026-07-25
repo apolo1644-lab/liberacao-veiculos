@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Liberação de Veículos</title>
+
+<!-- Firebase (Authentication + Firestore) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<style>
+  :root{
+    --navy-900:#0b1f3a;
+    --navy-800:#0f2a4a;
+    --navy-700:#15355e;
+    --blue-600:#1565c0;
+    --blue-500:#1e7fe0;
+    --green-600:#2e7d32;
+    --green-100:#e8f5e9;
+    --red-600:#c62828;
+    --red-100:#fdecea;
+    --gray-50:#f4f6f9;
+    --gray-100:#eef1f6;
+    --gray-200:#e1e6ee;
+    --gray-400:#9aa5b5;
+    --gray-600:#5c6a80;
+    --gray-800:#26324a;
+    --white:#ffffff;
+    --radius:14px;
+    --shadow:0 2px 10px rgba(15,42,74,0.06);
+    --shadow-lg:0 8px 28px rgba(15,42,74,0.12);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI',Inter,system-ui,-apple-system,sans-serif;
+    background:var(--gray-50);
+    color:var(--gray-800);
+  }
+  .app{display:flex;min-height:100vh;}
+
+  /* ---------- LOGIN SCREEN ---------- */
+  .login-screen{
+    position:fixed;inset:0;z-index:100;display:none;
+    align-items:center;justify-content:center;padding:20px;
+    background:linear-gradient(135deg,var(--navy-900),var(--navy-700));
+  }
+  .login-screen.show{display:flex;}
+  .login-card{
+    background:#fff;border-radius:18px;padding:34px 30px;max-width:380px;width:100%;
+    box-shadow:var(--shadow-lg);
+  }
+  .login-brand{text-align:center;margin-bottom:22px;}
+  .login-brand .brand-mark{margin:0 auto 12px;width:52px;height:52px;font-size:19px;}
+  .login-brand h2{margin:0;font-size:20px;color:var(--navy-800);}
+  .login-brand p{margin:4px 0 0;font-size:12.5px;color:var(--gray-600);}
+  .auth-error{background:var(--red-100);color:var(--red-600);font-size:12.5px;padding:9px 12px;border-radius:8px;margin-bottom:12px;}
+  .auth-msg{background:var(--green-100);color:var(--green-600);font-size:12.5px;padding:9px 12px;border-radius:8px;margin-bottom:12px;}
+  .login-links{text-align:center;font-size:12.5px;color:var(--gray-600);margin-top:14px;}
+  .login-links a{color:var(--blue-600);font-weight:600;cursor:pointer;text-decoration:none;margin-left:4px;}
+
+  /* Sidebar */
+  .sidebar{
+    width:230px;
+    background:linear-gradient(180deg,var(--navy-900),var(--navy-800));
+    color:#dce6f5;
+    display:flex;
+    flex-direction:column;
+    padding:22px 14px;
+    flex-shrink:0;
+  }
+  .brand{
+    display:flex;align-items:center;gap:10px;
+    padding:6px 8px 22px 8px;
+    border-bottom:1px solid rgba(255,255,255,0.08);
+    margin-bottom:18px;
+  }
+  .brand-mark{
+    width:38px;height:38px;border-radius:10px;
+    background:linear-gradient(135deg,var(--blue-500),var(--navy-700));
+    display:flex;align-items:center;justify-content:center;
+    font-weight:800;color:#fff;font-size:15px;
+  }
+  .brand-text{font-weight:700;font-size:14.5px;color:#fff;line-height:1.2;}
+  .brand-text span{display:block;font-weight:400;font-size:10.5px;color:#9db4d6;}
+
+  .nav{display:flex;flex-direction:column;gap:3px;flex:1;}
+  .nav-item{
+    display:flex;align-items:center;gap:11px;
+    padding:10px 12px;border-radius:10px;cursor:pointer;
+    font-size:14px;color:#c4d3ea;transition:.15s;user-select:none;
+  }
+  .nav-item svg{width:18px;height:18px;flex-shrink:0;}
+  .nav-item:hover{background:rgba(255,255,255,0.06);color:#fff;}
+  .nav-item.active{background:var(--blue-600);color:#fff;}
+  .nav-footer{border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;margin-top:10px;}
+
+  /* Main */
+  .main{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .topbar{
+    background:linear-gradient(120deg,var(--navy-800),var(--navy-700) 70%);
+    color:#fff;padding:26px 34px;
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .topbar h1{margin:0;font-size:24px;font-weight:700;}
+  .topbar h1 .accent{color:#5fb3ff;}
+  .topbar p{margin:6px 0 0;color:#b9c9e4;font-size:13.5px;}
+  .profile{display:flex;align-items:center;gap:10px;}
+  .avatar{
+    width:42px;height:42px;border-radius:50%;
+    background:var(--blue-500);display:flex;align-items:center;justify-content:center;
+    font-weight:700;color:#fff;font-size:15px;border:2px solid #4dd07a;
+  }
+  .profile-text{font-size:13.5px;line-height:1.3;max-width:190px;}
+  .profile-text b{display:block;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .profile-text span{color:#9db4d6;font-size:12px;}
+
+  .content{padding:26px 34px;flex:1;}
+
+  /* Stat cards */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:22px;}
+  .stat-card{
+    background:var(--white);border-radius:var(--radius);padding:20px 22px;
+    display:flex;align-items:center;gap:16px;box-shadow:var(--shadow);
+  }
+  .stat-icon{
+    width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .stat-icon svg{width:24px;height:24px;}
+  .stat-icon.blue{background:var(--blue-600);color:#fff;}
+  .stat-icon.green{background:var(--green-600);color:#fff;}
+  .stat-icon.red{background:var(--red-600);color:#fff;}
+  .stat-label{color:var(--gray-600);font-size:13px;margin-bottom:2px;}
+  .stat-value{font-size:26px;font-weight:800;color:var(--navy-800);}
+
+  /* Filters */
+  .filters{display:flex;gap:14px;align-items:center;margin-bottom:20px;flex-wrap:wrap;}
+  .filters input[type=date], .filters select, .filters input[type=text]{
+    padding:11px 14px;border-radius:10px;border:1px solid var(--gray-200);
+    background:var(--white);font-size:13.5px;color:var(--gray-800);min-width:170px;
+  }
+  .filters input[type=text]{min-width:220px;}
+  .link-btn{
+    display:flex;align-items:center;gap:6px;color:var(--navy-700);font-size:13.5px;
+    cursor:pointer;font-weight:600;margin-left:auto;
+  }
+  .link-btn svg{width:15px;height:15px;}
+
+  /* Grid of vehicle cards */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:18px;}
+  .vcard{
+    background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);
+    padding:18px 20px;position:relative;
+  }
+  .vcard-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .vcard-title{display:flex;align-items:center;gap:10px;}
+  .vcard-title h3{margin:0;font-size:15px;color:var(--navy-800);letter-spacing:.3px;}
+  .icon-btn{
+    background:none;border:none;cursor:pointer;color:var(--gray-400);padding:4px;border-radius:6px;
+  }
+  .icon-btn:hover{color:var(--red-600);background:var(--red-100);}
+  .icon-btn svg{width:17px;height:17px;display:block;}
+
+  .vcard-body{display:flex;align-items:center;gap:16px;}
+  .badge{
+    width:150px;height:64px;border-radius:8px;flex-shrink:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-weight:800;letter-spacing:.5px;text-align:center;padding:4px;
+  }
+  .badge-lovato{background:linear-gradient(120deg,#0c2f57,#1565c0 85%);color:#fff;}
+  .lv-word{display:flex;align-items:center;justify-content:center;line-height:1;}
+  .lv-word .lv-trans{font-size:14px;font-weight:400;letter-spacing:.5px;}
+  .lv-word .lv-lovato{font-size:15px;font-weight:800;letter-spacing:.5px;}
+  .lv-stripes{display:inline-flex;margin:0 4px;height:16px;align-items:center;}
+  .lv-stripes span{width:3px;height:16px;background:#fff;transform:skewX(-18deg);margin-left:2px;opacity:.95;}
+  .badge-lovato .b2{font-size:7.5px;font-weight:400;margin-top:4px;opacity:.85;font-style:italic;}
+
+  .badge-farrapos{background:#fff;border:1px solid var(--gray-200);color:#8a1010;}
+  .badge-farrapos .b0{font-size:7.5px;color:#666;letter-spacing:2px;font-weight:600;}
+  .badge-farrapos .b1{font-family:Georgia,'Times New Roman',serif;font-style:italic;font-size:21px;font-weight:800;color:#9c1418;letter-spacing:-.3px;margin-top:1px;}
+
+  .badge-vitoria{background:#fff;border:1px solid var(--gray-200);flex-direction:row;gap:8px;}
+  .vt-mark{width:24px;height:28px;flex-shrink:0;}
+  .vt-text{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;}
+  .vt-text .b1{font-size:16px;font-weight:800;color:#0f2a4a;line-height:1;letter-spacing:-.2px;}
+  .vt-text .b1 span{color:#c62828;}
+  .vt-text .b2{font-size:7px;color:#c62828;letter-spacing:1.6px;margin-top:3px;font-weight:600;}
+  .badge-dlb{background:var(--navy-800);color:#fff;}
+  .badge-dlb .b1{font-size:18px;}
+  .badge-custom{background:var(--gray-100);color:var(--gray-800);}
+  .badge-custom .b1{font-size:13px;}
+
+  .vcard-info{flex:1;font-size:13.5px;color:var(--gray-800);}
+  .vcard-info div{margin-bottom:4px;}
+  .vcard-info b{font-weight:600;color:var(--navy-800);}
+  .status-actions{display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .status-toggle{
+    width:38px;height:38px;border-radius:50%;border:2px solid var(--green-600);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--white);
+    transition:.15s;
+  }
+  .status-toggle svg{width:18px;height:18px;}
+  .status-toggle.liberado{border-color:var(--green-600);color:var(--green-600);}
+  .status-toggle.bloqueado{border-color:var(--red-600);color:var(--red-600);background:var(--red-100);}
+  .status-caption{font-size:10.5px;color:var(--gray-600);font-weight:600;}
+  .mail-btn{
+    font-size:11px;color:var(--blue-600);cursor:pointer;font-weight:600;background:none;border:none;
+    display:flex;align-items:center;gap:3px;padding:0;
+  }
+  .mail-btn svg{width:12px;height:12px;}
+
+  .empty{
+    text-align:center;padding:60px 20px;color:var(--gray-400);
+  }
+  .empty svg{width:52px;height:52px;margin-bottom:12px;opacity:.5;}
+
+  /* FAB */
+  .fab{
+    position:fixed;bottom:32px;right:38px;width:56px;height:56px;border-radius:50%;
+    background:var(--navy-800);color:#fff;border:none;cursor:pointer;box-shadow:var(--shadow-lg);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .fab svg{width:24px;height:24px;}
+  .fab:hover{background:var(--blue-600);}
+
+  /* Modal */
+  .overlay{
+    position:fixed;inset:0;background:rgba(11,31,58,0.55);display:none;
+    align-items:center;justify-content:center;z-index:50;padding:20px;
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:#fff;border-radius:16px;width:100%;max-width:440px;padding:26px 28px;box-shadow:var(--shadow-lg);
+  }
+  .modal h2{margin:0 0 18px;font-size:18px;color:var(--navy-800);}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--gray-600);margin-bottom:5px;}
+  .field input, .field select, .field textarea{
+    width:100%;padding:10px 12px;border-radius:9px;border:1px solid var(--gray-200);font-size:13.5px;
+    font-family:inherit;
+  }
+  .field textarea{resize:vertical;min-height:60px;}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;}
+  .btn{padding:10px 18px;border-radius:9px;border:none;font-weight:600;font-size:13.5px;cursor:pointer;}
+  .btn-primary{background:var(--blue-600);color:#fff;}
+  .btn-primary:hover{background:var(--navy-700);}
+  .btn-primary:disabled{opacity:.6;cursor:default;}
+  .btn-ghost{background:var(--gray-100);color:var(--gray-800);}
+  .btn-ghost:hover{background:var(--gray-200);}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .settings-box{background:#fff;border-radius:var(--radius);box-shadow:var(--shadow);padding:24px 26px;max-width:560px;}
+  .settings-box h3{margin-top:0;font-size:15px;color:var(--navy-800);}
+  .settings-box p.hint{font-size:12px;color:var(--gray-600);margin-top:-8px;margin-bottom:16px;}
+  .save-msg{font-size:12.5px;color:var(--green-600);margin-left:10px;font-weight:600;opacity:0;transition:.3s;}
+  .save-msg.show{opacity:1;}
+
+  .report-actions{display:flex;gap:12px;margin-bottom:20px;}
+
+  .carrier-row{display:flex;gap:10px;align-items:flex-end;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--gray-100);}
+  .carrier-row:last-child{border-bottom:none;}
+  .carrier-row .field{flex:1;margin-bottom:0;}
+  .carrier-row .carrier-fixed-label{flex:1;font-size:13px;font-weight:700;color:var(--navy-800);padding:10px 0;}
+  .carrier-row .carrier-name-input{flex:1;}
+  .carrier-remove{background:var(--red-100);color:var(--red-600);border:none;border-radius:8px;width:36px;height:36px;flex-shrink:0;cursor:pointer;}
+  .carrier-remove svg{width:15px;height:15px;}
+
+  @media(max-width:900px){
+    .sidebar{width:78px;}
+    .brand-text, .nav-item span{display:none;}
+    .brand{justify-content:center;}
+    .nav-item{justify-content:center;}
+    .stats{grid-template-columns:1fr;}
+    .content{padding:18px;}
+    .topbar{padding:20px 18px;}
+    .profile-text{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN SCREEN ================= -->
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="brand-mark">TL</div>
+      <h2 id="auth-title">Entrar</h2>
+      <p>Painel de Liberação de Veículos</p>
+    </div>
+    <form id="auth-form">
+      <input type="hidden" id="auth-mode" value="login">
+      <div class="field">
+        <label>E-mail</label>
+        <input type="email" id="auth-email" required placeholder="seuemail@grendene.com.br">
+      </div>
+      <div class="field">
+        <label>Senha</label>
+        <input type="password" id="auth-password" required minlength="6" placeholder="********">
+      </div>
+      <div class="auth-error" id="auth-error" style="display:none;"></div>
+      <div class="auth-msg" id="auth-msg" style="display:none;"></div>
+      <button type="submit" class="btn btn-primary" id="auth-submit-btn" style="width:100%;margin-top:4px;">Entrar</button>
+    </form>
+    <div class="login-links">
+      <span id="auth-toggle-text">Ainda não tem conta?</span>
+      <a onclick="toggleAuthMode()" id="auth-toggle-link">Criar conta</a>
+    </div>
+    <div class="login-links">
+      <a onclick="forgotPassword()">Esqueci minha senha</a>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div class="app" id="app-screen" style="display:none;">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">TL</div>
+      <div class="brand-text">Painel de Liberação<span>Gestão de veículos</span></div>
+    </div>
+    <div class="nav">
+      <div class="nav-item active" data-view="inicio">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>
+        <span>Início</span>
+      </div>
+      <div class="nav-item" data-view="veiculos">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="7" width="15" height="10" rx="1"/><path d="M16 10h3l3 3v4h-6"/><circle cx="6" cy="19" r="1.6"/><circle cx="17.5" cy="19" r="1.6"/></svg>
+        <span>Veículos</span>
+      </div>
+      <div class="nav-item" data-view="liberados">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        <span>Liberados</span>
+      </div>
+      <div class="nav-item" data-view="bloqueados">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+        <span>Bloqueados</span>
+      </div>
+      <div class="nav-item" data-view="relatorios">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>
+        <span>Relatórios</span>
+      </div>
+      <div class="nav-item" data-view="config">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.6V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.6-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.6-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.6V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.6 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.6 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.6 1z"/></svg>
+        <span>Configurações</span>
+      </div>
+      <div class="nav-item" data-view="admin" id="nav-admin" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        <span>Painel Admin</span>
+      </div>
+    </div>
+    <div class="nav-footer">
+      <div class="nav-item" onclick="logout()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        <span>Sair</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <h1>Bom dia, <span class="accent" id="greeting-name">!</span></h1>
+        <p>Painel de liberação de veículos com notificação automática por e-mail.</p>
+      </div>
+      <div class="profile">
+        <div class="avatar" id="profile-avatar">--</div>
+        <div class="profile-text"><b id="profile-name">Carregando...</b><span>Logística · Grendene</span></div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- VIEW: INICIO -->
+      <div class="view active" id="view-inicio">
+        <div class="stats">
+          <div class="stat-card">
+            <div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="7" width="15" height="10" rx="1"/><path d="M16 10h3l3 3v4h-6"/><circle cx="6" cy="19" r="1.6"/><circle cx="17.5" cy="19" r="1.6"/></svg></div>
+            <div><div class="stat-label">Total de Veículos</div><div class="stat-value" id="stat-total">0</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg></div>
+            <div><div class="stat-label">Liberados</div><div class="stat-value" id="stat-liberados">0</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg></div>
+            <div><div class="stat-label">Bloqueados</div><div class="stat-value" id="stat-bloqueados">0</div></div>
+          </div>
+        </div>
+
+        <div class="filters">
+          <input type="date" id="filter-date">
+          <select id="filter-empresa">
+            <option value="">Selecione a empresa</option>
+            <option value="LOVATO">TRANSLOVATO</option>
+            <option value="FARRAPOS">TRANSFARRAPOS</option>
+            <option value="VITORIA">VITÓRIA</option>
+            <option value="DLB">DLB</option>
+          </select>
+          <input type="text" id="filter-search" placeholder="Buscar placa ou motorista...">
+          <div class="link-btn" onclick="clearFilters()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+            Limpar filtros
+          </div>
+        </div>
+
+        <div class="grid" id="grid-inicio"></div>
+      </div>
+
+      <!-- VIEW: VEICULOS -->
+      <div class="view" id="view-veiculos">
+        <div class="filters">
+          <input type="text" id="filter-search-2" placeholder="Buscar placa ou motorista...">
+        </div>
+        <div class="grid" id="grid-veiculos"></div>
+      </div>
+
+      <!-- VIEW: LIBERADOS -->
+      <div class="view" id="view-liberados">
+        <div class="grid" id="grid-liberados"></div>
+      </div>
+
+      <!-- VIEW: BLOQUEADOS -->
+      <div class="view" id="view-bloqueados">
+        <div class="grid" id="grid-bloqueados"></div>
+      </div>
+
+      <!-- VIEW: RELATORIOS -->
+      <div class="view" id="view-relatorios">
+        <div class="settings-box">
+          <h3>Exportar relatório</h3>
+          <p class="hint">Gera um arquivo CSV com todos os seus registros na nuvem (abre direto no Excel).</p>
+          <div class="report-actions">
+            <button class="btn btn-primary" onclick="exportCSV('todos')">Exportar tudo</button>
+            <button class="btn btn-ghost" onclick="exportCSV('liberado')">Somente liberados</button>
+            <button class="btn btn-ghost" onclick="exportCSV('bloqueado')">Somente bloqueados</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW: CONFIG -->
+      <div class="view" id="view-config">
+        <div class="settings-box" style="margin-bottom:20px;">
+          <h3>E-mails por transportadora</h3>
+          <p class="hint">Cadastre o e-mail de cada transportadora. Ao clicar em "Notificar" num veículo, o app manda direto para o e-mail certo, sem você precisar escolher — se uma transportadora não tiver e-mail cadastrado aqui, ele usa o "e-mail de reserva" lá embaixo.</p>
+          <div id="carrier-email-rows"></div>
+          <button type="button" class="btn btn-ghost" onclick="addCarrierRow()" style="margin-top:4px;">+ Adicionar outra transportadora</button>
+        </div>
+        <div class="settings-box">
+          <h3>Notificação por e-mail (Outlook)</h3>
+          <p class="hint">Ao clicar em "Liberar" num veículo, o app abre um rascunho no Outlook já preenchido com os dados. Essas configurações ficam salvas na nuvem, na sua conta.</p>
+          <div class="field">
+            <label>E-mail de reserva — usado quando a transportadora não tem e-mail próprio cadastrado</label>
+            <input type="text" id="cfg-to" placeholder="portaria@grendene.com.br, seguranca@grendene.com.br">
+          </div>
+          <div class="field">
+            <label>Cópia (CC) — opcional, aplicada a todos os e-mails</label>
+            <input type="text" id="cfg-cc" placeholder="lucas@grendene.com.br">
+          </div>
+          <div class="field">
+            <label>Modelo do assunto</label>
+            <input type="text" id="cfg-subject" value="Liberação de Veículo - {placa} - {empresa}">
+          </div>
+          <div class="field">
+            <label>Modelo do corpo do e-mail</label>
+            <textarea id="cfg-body">LIBERACAO DE VEICULO
+-----------------------------
+
+Prezados,
+
+Segue liberacao do veiculo abaixo para saida:
+
+Empresa:    {empresa}
+Motorista:  {motorista}
+Placa:      {placa}
+Lacre:      {lacre}
+Data/Hora:  {datahora}
+
+-----------------------------
+Atenciosamente,
+
+Francisco Lucas Apolonio Soares
+Lider tecnico CD - Expedicao
+Fabrica 1 | Unidade Fortaleza
+Grendene S/A - Melissa</textarea>
+          </div>
+          <button class="btn btn-primary" onclick="saveSettings()">Salvar configurações</button>
+          <span class="save-msg" id="save-msg">Salvo!</span>
+        </div>
+      </div>
+
+      <!-- VIEW: ADMIN -->
+      <div class="view" id="view-admin">
+        <div class="filters">
+          <select id="admin-filter-empresa" onchange="renderAdmin()">
+            <option value="">Todas as empresas</option>
+            <option value="LOVATO">TRANSLOVATO</option>
+            <option value="FARRAPOS">TRANSFARRAPOS</option>
+            <option value="VITORIA">VITÓRIA</option>
+            <option value="DLB">DLB</option>
+          </select>
+          <input type="text" id="admin-filter-search" placeholder="Buscar placa, motorista ou usuário..." oninput="renderAdmin()">
+          <span id="admin-count" style="margin-left:auto;font-size:12.5px;color:var(--gray-600);font-weight:600;"></span>
+        </div>
+        <p class="hint" style="margin:-10px 0 16px;">Feed ao vivo com a atividade de todos os usuários (últimos 300 registros), visível só para contas administradoras.</p>
+        <div class="grid" id="grid-admin"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" onclick="openModal()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+
+  <!-- MODAL: novo veículo -->
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h2 id="modal-title">Novo veículo</h2>
+      <div class="field">
+        <label>Empresa</label>
+        <select id="f-empresa">
+          <option value="LOVATO">TRANSLOVATO</option>
+          <option value="FARRAPOS">TRANSFARRAPOS</option>
+          <option value="VITORIA">VITÓRIA</option>
+          <option value="DLB">DLB</option>
+          <option value="OUTRA">Outra...</option>
+        </select>
+      </div>
+      <div class="field" id="f-empresa-outra-wrap" style="display:none;">
+        <label>Nome da empresa</label>
+        <input type="text" id="f-empresa-outra" placeholder="Nome da transportadora">
+      </div>
+      <div class="field">
+        <label>Motorista</label>
+        <input type="text" id="f-motorista" placeholder="Nome do motorista">
+      </div>
+      <div class="field">
+        <label>Placa</label>
+        <input type="text" id="f-placa" placeholder="AAA-0A00" style="text-transform:uppercase">
+      </div>
+      <div class="field">
+        <label>Lacre(s)</label>
+        <input type="text" id="f-lacre" placeholder="000000">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-primary" id="save-veiculo-btn" onclick="saveVeiculo()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =====================================================================
+   CONFIGURACAO DO FIREBASE
+   Cole aqui o firebaseConfig do SEU projeto (Console Firebase > Configuracoes
+   do projeto > Seus apps > Web). Veja o passo a passo enviado junto.
+   ===================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDLKJvzeEgVUUBJWD6MRSwPUe1IRuKr1bE",
+  authDomain: "liberacao-veiculos-a3688.firebaseapp.com",
+  projectId: "liberacao-veiculos-a3688",
+  storageBucket: "liberacao-veiculos-a3688.firebasestorage.app",
+  messagingSenderId: "748545120094",
+  appId: "1:748545120094:web:273a50cc76c1f341d821cf"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/* ---------- Estado ---------- */
+let currentUser = null;
+let unsubscribeVeiculos = null;
+let records = [];
+let isAdmin = false;
+let unsubscribeAdmin = null;
+let adminRecords = [];
+
+/* ---------- Autenticacao ---------- */
+auth.onAuthStateChanged(user => {
+  if(user){
+    currentUser = user;
+    document.getElementById('login-screen').classList.remove('show');
+    document.getElementById('app-screen').style.display = 'flex';
+    updateProfileUI(user);
+    attachVeiculosListener(user.uid);
+    loadSettingsFromCloud(user.uid);
+    checkAdminStatus(user.uid);
+  } else {
+    currentUser = null;
+    isAdmin = false;
+    if(unsubscribeVeiculos){ unsubscribeVeiculos(); unsubscribeVeiculos = null; }
+    if(unsubscribeAdmin){ unsubscribeAdmin(); unsubscribeAdmin = null; }
+    records = [];
+    adminRecords = [];
+    document.getElementById('nav-admin').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'none';
+    document.getElementById('login-screen').classList.add('show');
+  }
+});
+
+function updateProfileUI(user){
+  const name = (user.email || 'usuario').split('@')[0];
+  document.getElementById('profile-name').textContent = user.email;
+  document.getElementById('profile-avatar').textContent = name.slice(0,2).toUpperCase();
+  document.getElementById('greeting-name').textContent = name;
+}
+
+document.getElementById('auth-form').addEventListener('submit', async function(e){
+  e.preventDefault();
+  showAuthError('');
+  showAuthMsg('');
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const mode = document.getElementById('auth-mode').value;
+  const btn = document.getElementById('auth-submit-btn');
+  btn.disabled = true;
+  try{
+    if(mode === 'signup'){
+      await auth.createUserWithEmailAndPassword(email, password);
+    } else {
+      await auth.signInWithEmailAndPassword(email, password);
+    }
+  }catch(err){
+    showAuthError(traduzErroFirebase(err));
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+function toggleAuthMode(){
+  const modeInput = document.getElementById('auth-mode');
+  const isSignup = modeInput.value === 'signup';
+  modeInput.value = isSignup ? 'login' : 'signup';
+  document.getElementById('auth-submit-btn').textContent = isSignup ? 'Entrar' : 'Criar conta';
+  document.getElementById('auth-title').textContent = isSignup ? 'Entrar' : 'Criar conta';
+  document.getElementById('auth-toggle-text').textContent = isSignup ? 'Ainda não tem conta?' : 'Já tem conta?';
+  document.getElementById('auth-toggle-link').textContent = isSignup ? 'Criar conta' : 'Entrar';
+  showAuthError(''); showAuthMsg('');
+}
+
+function forgotPassword(){
+  const email = document.getElementById('auth-email').value.trim();
+  if(!email){ showAuthError('Digite seu e-mail acima e clique de novo para receber o link de redefinicao.'); return; }
+  auth.sendPasswordResetEmail(email)
+    .then(()=>showAuthMsg('E-mail de redefinicao enviado! Verifique sua caixa de entrada.'))
+    .catch(err=>showAuthError(traduzErroFirebase(err)));
+}
+
+function showAuthError(msg){
+  const el = document.getElementById('auth-error');
+  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+}
+function showAuthMsg(msg){
+  const el = document.getElementById('auth-msg');
+  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+}
+function traduzErroFirebase(err){
+  const map = {
+    'auth/email-already-in-use':'Este e-mail ja esta cadastrado. Tente entrar.',
+    'auth/invalid-email':'E-mail invalido.',
+    'auth/weak-password':'A senha precisa ter pelo menos 6 caracteres.',
+    'auth/user-not-found':'Usuario nao encontrado.',
+    'auth/wrong-password':'Senha incorreta.',
+    'auth/invalid-credential':'E-mail ou senha incorretos.',
+    'auth/too-many-requests':'Muitas tentativas. Aguarde um momento e tente novamente.',
+    'auth/network-request-failed':'Falha de rede. Verifique sua conexao.'
+  };
+  return map[err.code] || ('Erro: ' + err.message);
+}
+function logout(){ auth.signOut(); }
+
+/* ---------- Admin: ver tudo ao vivo ---------- */
+async function checkAdminStatus(uid){
+  try{
+    const doc = await db.collection('admins').doc(uid).get();
+    isAdmin = doc.exists;
+  }catch(e){
+    isAdmin = false;
+  }
+  document.getElementById('nav-admin').style.display = isAdmin ? 'flex' : 'none';
+  if(isAdmin){
+    attachAdminListener();
+  }
+}
+
+function attachAdminListener(){
+  if(unsubscribeAdmin) unsubscribeAdmin();
+  unsubscribeAdmin = db.collectionGroup('veiculos')
+    .orderBy('criadoEm','desc')
+    .limit(300)
+    .onSnapshot(function(snap){
+      adminRecords = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+      if(document.getElementById('view-admin').classList.contains('active')) renderAdmin();
+    }, function(err){
+      console.error('Erro no painel admin:', err);
+    });
+}
+
+function renderAdmin(){
+  const el = document.getElementById('grid-admin');
+  const empVal = document.getElementById('admin-filter-empresa').value;
+  const searchVal = (document.getElementById('admin-filter-search').value||'').toLowerCase();
+  const list = adminRecords.filter(function(r){
+    if(empVal && r.empresa !== empVal) return false;
+    if(searchVal && !((r.placa||'').toLowerCase().includes(searchVal) || (r.motorista||'').toLowerCase().includes(searchVal) || (r.ownerEmail||'').toLowerCase().includes(searchVal))) return false;
+    return true;
+  });
+  document.getElementById('admin-count').textContent = list.length + ' registro(s)';
+  if(list.length===0){
+    el.innerHTML = '<div class="empty" style="grid-column:1/-1;"><div>Nenhum registro encontrado.</div></div>';
+    return;
+  }
+  el.innerHTML = list.map(function(r){
+    const quando = r.criadoEm ? new Date(r.criadoEm).toLocaleString('pt-BR') : '-';
+    return '<div class="vcard">'
+      + '<div class="vcard-top">'
+      + '<div class="vcard-title"><h3>' + escapeHTML(empresaLabel(r.empresa)) + '</h3></div>'
+      + '<span class="status-caption" style="color:' + (r.status==='liberado' ? '#2e7d32' : '#c62828') + ';">' + (r.status==='liberado'?'Liberado':'Bloqueado') + '</span>'
+      + '</div>'
+      + '<div class="vcard-body">'
+      + badgeHTML(r.empresa)
+      + '<div class="vcard-info">'
+      + '<div><b>Motorista:</b> ' + escapeHTML(r.motorista||'-') + '</div>'
+      + '<div><b>Placa:</b> ' + escapeHTML(r.placa||'-') + '</div>'
+      + '<div><b>Lacre:</b> ' + escapeHTML(r.lacre||'-') + '</div>'
+      + '<div><b>Usuário:</b> ' + escapeHTML(r.ownerEmail||'-') + '</div>'
+      + '<div><b>Quando:</b> ' + escapeHTML(quando) + '</div>'
+      + '</div></div></div>';
+  }).join('');
+}
+
+/* ---------- Navegacao ---------- */
+document.querySelectorAll('.nav-item[data-view]').forEach(el=>{
+  el.addEventListener('click', ()=>switchView(el.dataset.view));
+});
+function switchView(view){
+  document.querySelectorAll('.nav-item[data-view]').forEach(n=>n.classList.toggle('active', n.dataset.view===view));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+view).classList.add('active');
+  if(view==='admin'){ renderAdmin(); } else { renderAll(); }
+}
+
+/* ---------- Empresa: rotulo e badge ---------- */
+function empresaLabel(code){
+  return {LOVATO:'TRANSLOVATO', FARRAPOS:'TRANSFARRAPOS', VITORIA:'VITÓRIA', DLB:'DLB'}[code] || code;
+}
+function badgeHTML(code){
+  if(code==='LOVATO') return '<div class="badge badge-lovato">'
+      + '<div class="lv-word"><span class="lv-trans">TRANS</span><span class="lv-stripes"><span></span><span></span></span><span class="lv-lovato">LOVATO</span></div>'
+      + '<div class="b2">Nosso destino é servir cada vez mais.</div>'
+      + '</div>';
+  if(code==='FARRAPOS') return '<div class="badge badge-farrapos"><div class="b0">GRUPO</div><div class="b1">Farrapos</div></div>';
+  if(code==='VITORIA') return '<div class="badge badge-vitoria">'
+      + '<svg class="vt-mark" viewBox="0 0 24 28" fill="none"><path d="M2 2L14 14L2 26" stroke="#0f2a4a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 2L22 14L12 26" stroke="#c62828" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      + '<div class="vt-text"><div class="b1">Vit<span>log</span></div><div class="b2">TRANSPORTES</div></div>'
+      + '</div>';
+  if(code==='DLB') return '<div class="badge badge-dlb"><div class="b1">DLB</div></div>';
+  return '<div class="badge badge-custom"><div class="b1">' + escapeHTML(code) + '</div></div>';
+}
+function escapeHTML(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+  });
+}
+
+/* ---------- Firestore: veiculos ---------- */
+function veiculosRef(){
+  return db.collection('users').doc(currentUser.uid).collection('veiculos');
+}
+function attachVeiculosListener(uid){
+  if(unsubscribeVeiculos) unsubscribeVeiculos();
+  unsubscribeVeiculos = db.collection('users').doc(uid).collection('veiculos')
+    .orderBy('criadoEm','desc')
+    .onSnapshot(function(snap){
+      records = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+      renderAll();
+    }, function(err){
+      console.error(err);
+      alert('Erro ao carregar dados da nuvem: ' + err.message);
+    });
+}
+
+/* ---------- Render ---------- */
+function renderAll(){
+  renderStats();
+  const dateVal = document.getElementById('filter-date').value;
+  const empVal = document.getElementById('filter-empresa').value;
+  const searchVal = (document.getElementById('filter-search').value||'').toLowerCase();
+
+  renderGrid('grid-inicio', records.filter(function(r){
+    if(dateVal && r.data !== dateVal) return false;
+    if(empVal && r.empresa !== empVal) return false;
+    if(searchVal && !(r.placa.toLowerCase().includes(searchVal) || r.motorista.toLowerCase().includes(searchVal))) return false;
+    return true;
+  }));
+
+  const search2 = (document.getElementById('filter-search-2').value||'').toLowerCase();
+  renderGrid('grid-veiculos', records.filter(function(r){
+    if(search2 && !(r.placa.toLowerCase().includes(search2) || r.motorista.toLowerCase().includes(search2))) return false;
+    return true;
+  }));
+
+  renderGrid('grid-liberados', records.filter(function(r){ return r.status==='liberado'; }));
+  renderGrid('grid-bloqueados', records.filter(function(r){ return r.status==='bloqueado'; }));
+}
+
+function renderStats(){
+  document.getElementById('stat-total').textContent = records.length;
+  document.getElementById('stat-liberados').textContent = records.filter(function(r){return r.status==='liberado';}).length;
+  document.getElementById('stat-bloqueados').textContent = records.filter(function(r){return r.status==='bloqueado';}).length;
+}
+
+function renderGrid(elId, list){
+  const el = document.getElementById(elId);
+  if(list.length===0){
+    el.innerHTML = '<div class="empty" style="grid-column:1/-1;">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="7" width="15" height="10" rx="1"/><path d="M16 10h3l3 3v4h-6"/></svg>'
+      + '<div>Nenhum veículo encontrado.</div></div>';
+    return;
+  }
+  el.innerHTML = list.map(function(r){
+    return '<div class="vcard">'
+      + '<div class="vcard-top">'
+      + '<div class="vcard-title"><h3>' + escapeHTML(empresaLabel(r.empresa)) + '</h3></div>'
+      + '<button class="icon-btn" title="Excluir" onclick="deleteVeiculo(\'' + r.id + '\')">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>'
+      + '</button></div>'
+      + '<div class="vcard-body">'
+      + badgeHTML(r.empresa)
+      + '<div class="vcard-info">'
+      + '<div><b>Motorista:</b> ' + escapeHTML(r.motorista) + '</div>'
+      + '<div><b>Placa:</b> ' + escapeHTML(r.placa) + '</div>'
+      + '<div><b>Lacre:</b> ' + escapeHTML(r.lacre) + '</div>'
+      + '</div>'
+      + '<div class="status-actions">'
+      + '<div class="status-toggle ' + r.status + '" title="' + (r.status==='liberado'?'Clique para bloquear':'Clique para liberar') + '" onclick="toggleStatus(\'' + r.id + '\')">'
+      + (r.status==='liberado'
+          ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>'
+          : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 6l12 12M18 6L6 18"/></svg>')
+      + '</div>'
+      + '<span class="status-caption">' + (r.status==='liberado'?'Liberado':'Bloqueado') + '</span>'
+      + '<button class="mail-btn" onclick="sendMail(\'' + r.id + '\')" title="Abrir e-mail no Outlook">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 6 10-6"/></svg>'
+      + 'Notificar</button>'
+      + '</div></div></div>';
+  }).join('');
+}
+
+/* ---------- Filtros ---------- */
+['filter-date','filter-empresa','filter-search'].forEach(function(id){
+  document.getElementById(id).addEventListener('input', renderAll);
+});
+document.getElementById('filter-search-2').addEventListener('input', renderAll);
+function clearFilters(){
+  document.getElementById('filter-date').value='';
+  document.getElementById('filter-empresa').value='';
+  document.getElementById('filter-search').value='';
+  renderAll();
+}
+
+/* ---------- CRUD (Firestore) ---------- */
+function openModal(){
+  document.getElementById('modal-title').textContent = 'Novo veículo';
+  document.getElementById('f-empresa').value = 'LOVATO';
+  document.getElementById('f-empresa-outra-wrap').style.display = 'none';
+  document.getElementById('f-empresa-outra').value = '';
+  document.getElementById('f-motorista').value = '';
+  document.getElementById('f-placa').value = '';
+  document.getElementById('f-lacre').value = '';
+  document.getElementById('overlay').classList.add('show');
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
+document.getElementById('f-empresa').addEventListener('change', function(){
+  document.getElementById('f-empresa-outra-wrap').style.display = this.value==='OUTRA' ? 'block' : 'none';
+});
+
+async function saveVeiculo(){
+  const motorista = document.getElementById('f-motorista').value.trim();
+  const placa = document.getElementById('f-placa').value.trim().toUpperCase();
+  const lacre = document.getElementById('f-lacre').value.trim();
+  let empresa = document.getElementById('f-empresa').value;
+  if(empresa==='OUTRA'){
+    empresa = document.getElementById('f-empresa-outra').value.trim().toUpperCase();
+  }
+  if(!motorista || !placa || !empresa){
+    alert('Preencha ao menos Empresa, Motorista e Placa.');
+    return;
+  }
+  const btn = document.getElementById('save-veiculo-btn');
+  btn.disabled = true;
+  try{
+    await veiculosRef().add({
+      empresa: empresa, motorista: motorista, placa: placa, lacre: lacre,
+      status: 'liberado',
+      data: new Date().toISOString().slice(0,10),
+      criadoEm: Date.now(),
+      ownerUid: currentUser.uid,
+      ownerEmail: currentUser.email
+    });
+    closeModal();
+  }catch(e){
+    alert('Erro ao salvar na nuvem: ' + e.message);
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+async function deleteVeiculo(id){
+  if(!confirm('Excluir este registro?')) return;
+  try{ await veiculosRef().doc(id).delete(); }
+  catch(e){ alert('Erro ao excluir: ' + e.message); }
+}
+
+async function toggleStatus(id){
+  const r = records.find(function(x){ return x.id===id; });
+  if(!r) return;
+  const wasBlocked = r.status === 'bloqueado';
+  const newStatus = r.status==='liberado' ? 'bloqueado' : 'liberado';
+  try{
+    await veiculosRef().doc(id).update({status:newStatus});
+    if(wasBlocked && newStatus==='liberado'){
+      if(confirm('Veículo liberado. Abrir e-mail de notificação no Outlook agora?')){
+        sendMail(id);
+      }
+    }
+  }catch(e){
+    alert('Erro ao atualizar status: ' + e.message);
+  }
+}
+
+/* ---------- E-mails por transportadora ---------- */
+const CARRIER_BASE = [
+  {code:'LOVATO', label:'TRANSLOVATO'},
+  {code:'FARRAPOS', label:'TRANSFARRAPOS'},
+  {code:'VITORIA', label:'VITÓRIA'},
+  {code:'DLB', label:'DLB'}
+];
+let carrierEmails = {};
+
+function renderCarrierRows(){
+  const wrap = document.getElementById('carrier-email-rows');
+  const customCodes = Object.keys(carrierEmails).filter(function(c){
+    return !CARRIER_BASE.some(function(b){ return b.code === c; });
+  });
+  let html = '';
+  CARRIER_BASE.forEach(function(b){
+    const cfg = carrierEmails[b.code] || {};
+    html += '<div class="carrier-row" data-code="' + b.code + '">'
+      + '<div class="carrier-fixed-label">' + b.label + '</div>'
+      + '<div class="field"><label>Destinatário</label><input type="text" class="carrier-to" value="' + escapeHTML(cfg.to||'') + '" placeholder="email@transportadora.com.br"></div>'
+      + '<div class="field"><label>CC (opcional)</label><input type="text" class="carrier-cc" value="' + escapeHTML(cfg.cc||'') + '"></div>'
+      + '</div>';
+  });
+  customCodes.forEach(function(code){
+    const cfg = carrierEmails[code] || {};
+    html += '<div class="carrier-row" data-code="' + escapeHTML(code) + '" data-custom="1">'
+      + '<div class="field"><label>Transportadora</label><input type="text" class="carrier-name-input" value="' + escapeHTML(code) + '" placeholder="NOME DA TRANSPORTADORA"></div>'
+      + '<div class="field"><label>Destinatário</label><input type="text" class="carrier-to" value="' + escapeHTML(cfg.to||'') + '"></div>'
+      + '<div class="field"><label>CC (opcional)</label><input type="text" class="carrier-cc" value="' + escapeHTML(cfg.cc||'') + '"></div>'
+      + '<button type="button" class="carrier-remove" onclick="this.closest(\'.carrier-row\').remove()" title="Remover">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>'
+      + '</div>';
+  });
+  wrap.innerHTML = html;
+}
+
+function addCarrierRow(){
+  const wrap = document.getElementById('carrier-email-rows');
+  const row = document.createElement('div');
+  row.className = 'carrier-row';
+  row.setAttribute('data-custom','1');
+  row.innerHTML = '<div class="field"><label>Transportadora</label><input type="text" class="carrier-name-input" placeholder="NOME DA TRANSPORTADORA"></div>'
+    + '<div class="field"><label>Destinatário</label><input type="text" class="carrier-to"></div>'
+    + '<div class="field"><label>CC (opcional)</label><input type="text" class="carrier-cc"></div>'
+    + '<button type="button" class="carrier-remove" onclick="this.closest(\'.carrier-row\').remove()" title="Remover">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+  wrap.appendChild(row);
+}
+
+function collectCarrierEmails(){
+  const result = {};
+  document.querySelectorAll('#carrier-email-rows .carrier-row').forEach(function(row){
+    let code = row.getAttribute('data-code');
+    if(row.getAttribute('data-custom') === '1'){
+      const nameInput = row.querySelector('.carrier-name-input');
+      code = nameInput ? nameInput.value.trim().toUpperCase() : '';
+    }
+    const to = row.querySelector('.carrier-to').value.trim();
+    const cc = row.querySelector('.carrier-cc').value.trim();
+    if(code && (to || cc)){
+      result[code] = {to: to, cc: cc};
+    }
+  });
+  return result;
+}
+
+/* ---------- Configuracoes (Firestore) ---------- */
+function settingsDocRef(){
+  return db.collection('users').doc(currentUser.uid).collection('meta').doc('settings');
+}
+async function loadSettingsFromCloud(uid){
+  try{
+    const doc = await db.collection('users').doc(uid).collection('meta').doc('settings').get();
+    const cfg = doc.exists ? doc.data() : {};
+    document.getElementById('cfg-to').value = cfg.to || '';
+    document.getElementById('cfg-cc').value = cfg.cc || '';
+    document.getElementById('cfg-subject').value = cfg.subject || 'Liberação de Veículo - {placa} - {empresa}';
+    if(cfg.body) document.getElementById('cfg-body').value = cfg.body;
+    carrierEmails = cfg.carrierEmails || {};
+    renderCarrierRows();
+  }catch(e){ console.error('Erro ao carregar configuracoes:', e); }
+}
+async function saveSettings(){
+  const cfg = {
+    to: document.getElementById('cfg-to').value.trim(),
+    cc: document.getElementById('cfg-cc').value.trim(),
+    subject: document.getElementById('cfg-subject').value.trim(),
+    body: document.getElementById('cfg-body').value,
+    carrierEmails: collectCarrierEmails()
+  };
+  try{
+    await settingsDocRef().set(cfg);
+    carrierEmails = cfg.carrierEmails;
+    renderCarrierRows();
+    const msg = document.getElementById('save-msg');
+    msg.classList.add('show');
+    setTimeout(function(){ msg.classList.remove('show'); }, 1800);
+  }catch(e){
+    alert('Erro ao salvar configurações: ' + e.message);
+  }
+}
+
+function fillTemplate(str, r){
+  const datahora = new Date().toLocaleString('pt-BR');
+  return str
+    .replaceAll('{empresa}', empresaLabel(r.empresa))
+    .replaceAll('{motorista}', r.motorista)
+    .replaceAll('{placa}', r.placa)
+    .replaceAll('{lacre}', r.lacre || '-')
+    .replaceAll('{datahora}', datahora);
+}
+
+function sendMail(id){
+  const r = records.find(function(x){ return x.id===id; });
+  if(!r) return;
+  const carrierCfg = carrierEmails[r.empresa] || {};
+  const fallbackTo = document.getElementById('cfg-to').value.trim();
+  const fallbackCc = document.getElementById('cfg-cc').value.trim();
+  const to = carrierCfg.to || fallbackTo;
+  const cc = carrierCfg.cc || fallbackCc;
+
+  if(!to){
+    alert('Nenhum e-mail cadastrado para ' + empresaLabel(r.empresa) + ' e nenhum e-mail de reserva definido. Vá em Configurações e cadastre pelo menos um dos dois.');
+    return;
+  }
+
+  const subjectTpl = document.getElementById('cfg-subject').value.trim() || 'Liberação de Veículo - {placa} - {empresa}';
+  const bodyTpl = document.getElementById('cfg-body').value;
+
+  const subject = fillTemplate(subjectTpl, r);
+  const body = fillTemplate(bodyTpl, r);
+
+  let mailto = 'mailto:' + encodeURIComponent(to) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  if(cc) mailto += '&cc=' + encodeURIComponent(cc);
+
+  window.location.href = mailto;
+}
+
+/* ---------- Relatorios / CSV ---------- */
+function exportCSV(filtro){
+  let list = records;
+  if(filtro==='liberado') list = records.filter(function(r){return r.status==='liberado';});
+  if(filtro==='bloqueado') list = records.filter(function(r){return r.status==='bloqueado';});
+
+  const header = ['Empresa','Motorista','Placa','Lacre','Status','Data'];
+  const rows = list.map(function(r){
+    return [empresaLabel(r.empresa), r.motorista, r.placa, r.lacre, (r.status==='liberado'?'Liberado':'Bloqueado'), r.data];
+  });
+  let csv = header.join(';') + '\n' + rows.map(function(row){
+    return row.map(function(v){ return '"' + String(v).replaceAll('"','""') + '"'; }).join(';');
+  }).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'liberacao_veiculos_' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- Init ---------- */
+document.getElementById('filter-date').value = new Date().toISOString().slice(0,10);
+</script>
+</body>
+</html>
